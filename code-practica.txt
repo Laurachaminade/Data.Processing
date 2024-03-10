@@ -1,0 +1,43 @@
+scala
+val df2021 = spark.read.format("csv")
+  .option("header", "true")
+  .load("dbfs:/FileStore/tables/practica/world_happiness_report_2021.csv")
+
+df2021.createOrReplaceTempView("world_happiness_report_2021")
+
+val dfOriginal = spark.read.format("csv")
+  .option("header", "true")
+  .load("dbfs:/FileStore/tables/practica/world_happiness_report_2021.csv")
+
+dfOriginal.createOrReplaceTempView("world_happiness")  //[`world_happiness_2021`.`Country name`, `world_happiness_2021`.`Generosity`, `world_happiness_2021`.`lowerwhisker`, `world_happiness_2021`.`upperwhisker`, `world_happiness_2021`.`Ladder score`]
+
+// 1. ¿Cuál es el país más “feliz” del 2021 según la data?
+val happiestCountry2021 = spark.sql("SELECT Country Name FROM world_happiness_2021 ORDER BY LadderScore DESC LIMIT 1")
+happiestCountry2021.show()
+
+// 2. ¿Cuál es el país más “feliz” del 2021 por continente según la data?
+val happiestCountryByContinent2021 = spark.sql("SELECT Continent, Country name FROM world_happiness_2021 WHERE Ladder Score IN (SELECT MAX(Ladder Score) FROM world_happiness_2021 GROUP BY Continent)")
+happiestCountryByContinent2021.show()
+
+// 3. ¿Cuál es el país que más veces ocupó el primer lugar en todos los años?
+val countryRankCounts = spark.sql("SELECT Country name, COUNT(*) AS Rank Count FROM world_happiness GROUP BY Country name HAVING MIN(Rank) = 1")
+val countryWithMostFirstPlaces = countryRankCounts.orderBy($"RankCount".desc).limit(1)
+countryWithMostFirstPlaces.show()
+
+// 4. ¿Qué puesto de Felicidad tiene el país con mayor GDP del 2020?
+val countryWithMaxGDP2020 = spark.sql("SELECT Country name FROM world_happiness WHERE Year = 2020 ORDER BY GDP DESC LIMIT 1")
+countryWithMaxGDP2020.show()
+
+// 5. ¿En qué porcentaje ha variado a nivel mundial el GDP promedio del 2020 respecto al 2021? ¿Aumentó o disminuyó?
+val avgGDP2020 = spark.sql("SELECT AVG(GDP) AS AvgGDP2020 FROM world_happiness WHERE Year = 2020")
+val avgGDP2021 = spark.sql("SELECT AVG(GDP) AS AvgGDP2021 FROM world_happiness WHERE Year = 2021")
+val percentChange = (avgGDP2021.first().getDouble(0) - avgGDP2020.first().getDouble(0)) / avgGDP2020.first().getDouble(0) * 100
+if (percentChange > 0) {
+    println(s"El GDP promedio aumentó un $percentChange% a nivel mundial del 2020 al 2021.")
+} else {
+    println(s"El GDP promedio disminuyó un ${math.abs(percentChange)}% a nivel mundial del 2020 al 2021.")
+}
+
+// 6. ¿Cuál es el país con mayor expectativa de vida (“Healthy life expectancy at birth”)? Y ¿Cuánto tenía en ese indicador en el 2019?
+val countryWithMaxExpectancy = spark.sql("SELECT Country name, HealthyLifeExpectancy FROM world_happiness WHERE Year = 2019 ORDER BY HealthyLifeExpectancy DESC LIMIT 1")
+countryWithMaxExpectancy.show()
